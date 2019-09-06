@@ -1,3 +1,9 @@
+python-docbrown (0.1.0-2) unstable; urgency=medium
+
+  * New upstream release
+
+ -- Konrad Mohrfeldt <mohrfeldt@silicann.com>  Fri, 06 Sep 2019 10:15:52 +0200
+
 python-docbrown (0.1.0-1) unstable; urgency=low
 
   * Initial release
