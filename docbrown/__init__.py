@@ -7,7 +7,7 @@ from typing import Callable
 
 from docbrown.storage import StorageBackend, SQLiteBackend
 
-VERSION = '0.1.0'
+VERSION = '0.1.1'
 
 
 def _resolve_backend(store):
