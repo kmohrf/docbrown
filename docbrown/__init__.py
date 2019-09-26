@@ -53,7 +53,11 @@ def record_progress(aggregator_key: str, ident: str = None, store: StorageBacken
     store_progress = partial(store.store_progress, ident, aggregator_key)
     recorder = _create_recorder(ident, store_progress)
     start = datetime.datetime.now()
-    yield recorder
+    try:
+        yield recorder
+    except Exception:
+        store.clear_progress(ident)
+        raise
     stop = datetime.datetime.now()
     store.store_timings(ident, aggregator_key,
                         _calculate_timings(start, stop, recorder.passed_phases))
