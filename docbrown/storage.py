@@ -118,6 +118,8 @@ class SQLiteBackend(StorageBackend):
             cursor.execute('SELECT phase, AVG(duration) AS duration FROM timings '
                            'WHERE aggregator_key = ? GROUP BY phase', [aggregator_key])
             timings = cursor.fetchall()
+            if len(timings) == 0:
+                return None
 
         timings = {phase: duration for phase, duration in timings}
         passed_phases = [PassedPhase(phase, datetime.datetime.fromisoformat(entered_at))
