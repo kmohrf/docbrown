@@ -3,15 +3,17 @@ import datetime
 from functools import partial
 import os
 import uuid
-from typing import Callable
+from typing import Any, Callable, Optional
 
-from docbrown.storage import StorageBackend, SQLiteBackend
+from docbrown.models import Progress
+from docbrown.storage import StorageBackend
 
 VERSION = '0.1.1'
 
 
 def _resolve_backend(store):
     if store is None:
+        from docbrown.storage.sqlite3 import SQLiteBackend
         return SQLiteBackend(
             os.path.join(os.path.expanduser('~'), '.python-docbrown.sqlite3'))
     else:
@@ -63,5 +65,6 @@ def record_progress(aggregator_key: str, ident: str = None, store: StorageBacken
                         _calculate_timings(start, stop, recorder.passed_phases))
 
 
-def get_progress(ident: str, store: StorageBackend = None):
-    return _resolve_backend(store).get_progress(ident)
+def get_progress(ident: str, store: StorageBackend = None,
+                 aggregator_func: Any = None) -> Optional[Progress]:
+    return _resolve_backend(store).get_progress(ident, aggregator_func)

@@ -1,42 +1,20 @@
 import contextlib
-import collections
 import datetime
-import logging
 import sqlite3
-from typing import Mapping, Sequence
+from typing import Callable, Optional, Sequence, Tuple
 
-Timings = Mapping[str, float]
-PassedPhase = collections.namedtuple('PassedPhase', ['phase', 'entered_at'])
-
-
-def _calculate_progress(passed_phases: Sequence[PassedPhase], timings: Timings,
-                        now: datetime.datetime):
-    expected_duration = sum(timings.values())
-    duration = (now - passed_phases[-1].entered_at).total_seconds()
-
-    return {
-        'expected_duration': expected_duration,
-        'passed_phases': len(passed_phases),
-        'expected_phases': len(timings) - 1,
-        'current_phase': passed_phases[0].phase,
-        'duration': duration,
-        'progress': min(100, max(0, duration / expected_duration * 100))
-    }
+from docbrown.models import PassedPhase, Progress, Timings
+from docbrown.storage import _calculate_progress, StorageBackend
 
 
-class StorageBackend:
-    def store_timings(self, ident, aggregator_key: str, timings: Timings):
-        raise NotImplementedError()
+TimingsResultSet = Sequence[Tuple[str, float]]
+AggregatorFunc = Callable[[sqlite3.Cursor, str], TimingsResultSet]
 
-    def store_progress(self, ident: str, aggregator_key: str, phase: str,
-                       entered_at: datetime.datetime):
-        raise NotImplementedError()
 
-    def clear_progress(self, ident: str):
-        raise NotImplementedError()
-
-    def get_progress(self, ident: str):
-        raise NotImplementedError()
+def aggregate_avg(cursor: sqlite3.Cursor, aggregator_key: str) -> TimingsResultSet:
+    cursor.execute('SELECT phase, AVG(duration) AS duration FROM timings '
+                   'WHERE aggregator_key = ? GROUP BY phase', [aggregator_key])
+    return cursor.fetchall()
 
 
 class SQLiteBackend(StorageBackend):
@@ -61,7 +39,6 @@ class SQLiteBackend(StorageBackend):
     @contextlib.contextmanager
     def _cursor(self):
         connection = sqlite3.connect(self.db_file)
-        connection.set_trace_callback(logging.debug)
         try:
             yield connection.cursor()
         finally:
@@ -84,7 +61,7 @@ class SQLiteBackend(StorageBackend):
                 cursor.execute('REPLACE INTO metadata(meta_key, meta_value) VALUES (?, ?);',
                                ('version', migration_version))
 
-    def store_timings(self, ident, aggregator_key: str, timings: Timings):
+    def store_timings(self, ident, aggregator_key: str, timings: Timings) -> None:
         with self._cursor() as cursor:
             for phase, duration in timings.items():
                 cursor.execute(
@@ -93,18 +70,19 @@ class SQLiteBackend(StorageBackend):
         self.clear_progress(ident)
 
     def store_progress(self, ident: str, aggregator_key: str, phase: str,
-                       entered_at: datetime.datetime):
+                       entered_at: datetime.datetime) -> None:
         with self._cursor() as cursor:
             cursor.execute('INSERT INTO progress(ident, aggregator_key, phase, entered_at) '
                            'VALUES(?, ?, ?, ?);',
                            [ident, aggregator_key, phase, entered_at.isoformat()])
 
-    def clear_progress(self, ident: str):
+    def clear_progress(self, ident: str) -> None:
         with self._cursor() as cursor:
             cursor.execute('DELETE FROM progress WHERE ident = ?', [ident])
 
-    def get_progress(self, ident):
+    def get_progress(self, ident: str, aggregator_func: AggregatorFunc) -> Optional[Progress]:
         now = datetime.datetime.now()
+        aggregator_func = aggregate_avg if aggregator_func is None else aggregator_func
 
         with self._cursor() as cursor:
             cursor.execute('SELECT aggregator_key, phase, entered_at FROM progress '
@@ -115,9 +93,7 @@ class SQLiteBackend(StorageBackend):
 
         aggregator_key = passed_phases[0][0]
         with self._cursor() as cursor:
-            cursor.execute('SELECT phase, AVG(duration) AS duration FROM timings '
-                           'WHERE aggregator_key = ? GROUP BY phase', [aggregator_key])
-            timings = cursor.fetchall()
+            timings = aggregator_func(cursor, aggregator_key)
             if len(timings) == 0:
                 return None
 
