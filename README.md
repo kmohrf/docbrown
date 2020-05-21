@@ -54,7 +54,5 @@ print(get_progress('my_ident'))
 There are some things that would be nice, but have not been implemented yet.
 
 * additional storage backends apart from SQLite
-* configurable strategy for aggregating phase durations apart from
-  the current simple arithmetic average like median
 * code path detection that takes optional phases into account and
   updates the expected duration and progress on-the-fly

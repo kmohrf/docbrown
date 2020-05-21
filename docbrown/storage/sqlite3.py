@@ -1,6 +1,7 @@
 import contextlib
 import datetime
 import sqlite3
+import statistics
 from typing import Callable, Optional, Sequence, Tuple
 
 from docbrown.models import PassedPhase, Progress, Timings
@@ -13,6 +14,22 @@ AggregatorFunc = Callable[[sqlite3.Cursor, str], TimingsResultSet]
 
 def aggregate_avg(cursor: sqlite3.Cursor, aggregator_key: str) -> TimingsResultSet:
     cursor.execute('SELECT phase, AVG(duration) AS duration FROM timings '
+                   'WHERE aggregator_key = ? GROUP BY phase', [aggregator_key])
+    return cursor.fetchall()
+
+
+def aggregate_median(cursor: sqlite3.Cursor, aggregator_key: str) -> TimingsResultSet:
+    class Median:
+        def __init__(self):
+            self.values = []
+
+        def step(self, value):
+            self.values.append(value)
+
+        def finalize(self):
+            return statistics.median(self.values)
+    cursor.connection.create_aggregate('MEDIAN', 1, Median)
+    cursor.execute('SELECT phase, MEDIAN(duration) AS duration FROM timings '
                    'WHERE aggregator_key = ? GROUP BY phase', [aggregator_key])
     return cursor.fetchall()
 
