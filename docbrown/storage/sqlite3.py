@@ -103,12 +103,12 @@ class SQLiteBackend(StorageBackend):
 
         with self._cursor() as cursor:
             cursor.execute('SELECT aggregator_key, phase, entered_at FROM progress '
-                           'WHERE ident = ? ORDER BY entered_at DESC;', [ident])
+                           'WHERE ident = ? ORDER BY entered_at;', [ident])
             passed_phases = cursor.fetchall()
             if len(passed_phases) == 0:
                 return None
 
-        aggregator_key = passed_phases[0][0]
+        aggregator_key = passed_phases[-1][0]
         with self._cursor() as cursor:
             timings = aggregator_func(cursor, aggregator_key)
             if len(timings) == 0:

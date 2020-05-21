@@ -15,3 +15,4 @@ class Progress:
     current_phase: str
     duration: float
     progress: float
+    is_stuck: bool
