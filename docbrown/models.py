@@ -13,6 +13,7 @@ class Progress:
     passed_phases: List[str]
     expected_phases: List[str]
     current_phase: str
+    phase_progress: float
     duration: float
     progress: float
     is_stuck: bool

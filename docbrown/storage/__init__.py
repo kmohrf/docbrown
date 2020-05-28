@@ -4,6 +4,10 @@ from typing import Any, Optional, Sequence
 from docbrown.models import PassedPhase, Progress, Timings
 
 
+def _clamp_progress(progress):
+    return min(100, max(0, progress * 100))
+
+
 def _calculate_progress(
         passed_phases: Sequence[PassedPhase],
         timings: Timings,
@@ -39,13 +43,16 @@ def _calculate_progress(
     for phase in passed_phase_names:
         if phase != current_phase.phase:
             total_progress += (timings[phase] / empirical_total_duration)
-    empirical_phase_ratio = timings[current_phase.phase] / empirical_total_duration
+    empirical_phase_duration = timings[current_phase.phase]
+    empirical_phase_ratio = empirical_phase_duration / empirical_total_duration
     current_phase_ratio = current_phase_duration / empirical_total_duration
     # Use the minimum of both values because more time spent in this phase
     # does not mean that following phases will take less time. This will
     # cause the progress to get stuck in place, but avoids progress that
     # goes backwards or stays at 100% for prolonged periods of time.
-    total_progress += min(empirical_phase_ratio, current_phase_ratio)
+    phase_progress_ratio = min(empirical_phase_ratio, current_phase_ratio)
+    phase_progress = current_phase_duration / empirical_phase_duration
+    total_progress += phase_progress_ratio
 
     # define a phase as stuck if it took 1.5 × the amount of time it usually does
     is_phase_stuck = current_phase_ratio / empirical_phase_ratio >= 1.5
@@ -58,8 +65,9 @@ def _calculate_progress(
         passed_phases=[phase.phase for phase in passed_phases],
         expected_phases=expected_phases,
         current_phase=current_phase.phase,
+        phase_progress=_clamp_progress(phase_progress),
         duration=current_duration,
-        progress=min(100, max(0, total_progress * 100)),
+        progress=_clamp_progress(total_progress),
         is_stuck=is_phase_stuck,
     )
 
