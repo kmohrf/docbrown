@@ -50,10 +50,13 @@ def _calculate_progress(
     # define a phase as stuck if it took 1.5 × the amount of time it usually does
     is_phase_stuck = current_phase_ratio / empirical_phase_ratio >= 1.5
 
+    expected_phases = list(timings.keys())
+    expected_phases.remove('__startup__')
+
     return Progress(
         expected_duration=expected_total_duration,
-        passed_phases=len(passed_phases),
-        expected_phases=len(timings) - 1,
+        passed_phases=[phase.phase for phase in passed_phases],
+        expected_phases=expected_phases,
         current_phase=current_phase.phase,
         duration=current_duration,
         progress=min(100, max(0, total_progress * 100)),

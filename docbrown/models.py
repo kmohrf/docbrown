@@ -1,6 +1,6 @@
 import collections
 import dataclasses
-from typing import Mapping
+from typing import List, Mapping
 
 
 Timings = Mapping[str, float]
@@ -10,8 +10,8 @@ PassedPhase = collections.namedtuple('PassedPhase', ['phase', 'entered_at'])
 @dataclasses.dataclass
 class Progress:
     expected_duration: float
-    passed_phases: int
-    expected_phases: int
+    passed_phases: List[str]
+    expected_phases: List[str]
     current_phase: str
     duration: float
     progress: float
