@@ -14,7 +14,7 @@ AggregatorFunc = Callable[[sqlite3.Cursor, str], TimingsResultSet]
 
 def aggregate_avg(cursor: sqlite3.Cursor, aggregator_key: str) -> TimingsResultSet:
     cursor.execute('SELECT phase, AVG(duration) AS duration FROM timings '
-                   'WHERE aggregator_key = ? GROUP BY phase', [aggregator_key])
+                   'WHERE aggregator_key = ? GROUP BY phase ORDER BY ordinal', [aggregator_key])
     return cursor.fetchall()
 
 
@@ -30,7 +30,7 @@ def aggregate_median(cursor: sqlite3.Cursor, aggregator_key: str) -> TimingsResu
             return statistics.median(self.values)
     cursor.connection.create_aggregate('MEDIAN', 1, Median)
     cursor.execute('SELECT phase, MEDIAN(duration) AS duration FROM timings '
-                   'WHERE aggregator_key = ? GROUP BY phase', [aggregator_key])
+                   'WHERE aggregator_key = ? GROUP BY phase ORDER BY ordinal', [aggregator_key])
     return cursor.fetchall()
 
 
@@ -47,6 +47,9 @@ class SQLiteBackend(StorageBackend):
             "                       phase TEXT NOT NULL, "
             "                       entered_at TEXT NOT NULL);",
         ),
+        (
+            "ALTER TABLE timings ADD COLUMN ordinal INTEGER",
+        )
     )
 
     def __init__(self, db_file):
@@ -80,10 +83,11 @@ class SQLiteBackend(StorageBackend):
 
     def store_timings(self, ident, aggregator_key: str, timings: Timings) -> None:
         with self._cursor() as cursor:
-            for phase, duration in timings.items():
+            for index, (phase, duration) in enumerate(timings.items()):
                 cursor.execute(
-                    'INSERT INTO timings(aggregator_key, phase, duration) VALUES (?, ?, ?);',
-                    (aggregator_key, phase, duration))
+                    'INSERT INTO timings(aggregator_key, phase, duration, ordinal) '
+                    'VALUES (?, ?, ?, ?);',
+                    (aggregator_key, phase, duration, index))
         self.clear_progress(ident)
 
     def store_progress(self, ident: str, aggregator_key: str, phase: str,
