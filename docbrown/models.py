@@ -19,6 +19,9 @@ class Progress:
     progress: float
     is_stuck: bool
 
+    def serialize(self):
+        return dataclasses.asdict(self)
+
 
 def _clamp_progress(progress):
     return min(100, max(0, progress * 100))
