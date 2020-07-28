@@ -36,6 +36,9 @@ def calculate_progress(
     current_duration = (now - passed_phases[0].entered_at).total_seconds()
     empirical_total_duration = sum(timings.values())
     passed_phase_names = [phase.phase for phase in passed_phases]
+    # We may encounter new phases that have not been recorded yet.
+    # In these cases we just assume that the phase basically takes no time.
+    empirical_phase_duration = timings.get(current_phase.phase, 0)
 
     # we calculate the expected duration as the total of
     #  * the time it took for previous phases to complete
@@ -48,7 +51,7 @@ def calculate_progress(
         except IndexError:
             break
         expected_total_duration += (next_phase.entered_at - phase.entered_at).total_seconds()
-    expected_total_duration += max(current_phase_duration, timings[current_phase.phase])
+    expected_total_duration += max(current_phase_duration, empirical_phase_duration)
     for phase_name in timings.keys():
         if phase_name not in passed_phase_names:
             expected_total_duration += timings[phase_name]
@@ -61,8 +64,7 @@ def calculate_progress(
     total_progress = 0
     for phase in passed_phase_names:
         if phase != current_phase.phase:
-            total_progress += (timings[phase] / empirical_total_duration)
-    empirical_phase_duration = timings[current_phase.phase]
+            total_progress += (timings.get(phase, 0) / empirical_total_duration)
     empirical_phase_ratio = empirical_phase_duration / empirical_total_duration
     current_phase_ratio = current_phase_duration / empirical_total_duration
     # Use the minimum of both values because more time spent in this phase
@@ -70,11 +72,14 @@ def calculate_progress(
     # cause the progress to get stuck in place, but avoids progress that
     # goes backwards or stays at 100% for prolonged periods of time.
     phase_progress_ratio = min(empirical_phase_ratio, current_phase_ratio)
-    phase_progress = current_phase_duration / empirical_phase_duration
+    try:
+        phase_progress = current_phase_duration / empirical_phase_duration
+        # define a phase as stuck if it took 1.5 × the amount of time it usually does
+        is_phase_stuck = current_phase_ratio / empirical_phase_ratio >= 1.5
+    except ZeroDivisionError:
+        phase_progress = 0
+        is_phase_stuck = False
     total_progress += phase_progress_ratio
-
-    # define a phase as stuck if it took 1.5 × the amount of time it usually does
-    is_phase_stuck = current_phase_ratio / empirical_phase_ratio >= 1.5
 
     expected_phases = list(timings.keys())
     expected_phases.remove('__startup__')
