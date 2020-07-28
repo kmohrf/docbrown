@@ -8,7 +8,7 @@ from typing import Any, Optional
 from docbrown.models import Progress
 from docbrown.storage import StorageBackend
 
-VERSION = '0.4.0'
+VERSION = '0.5.0'
 
 
 def _resolve_backend(store):
