@@ -1,5 +1,7 @@
 include make.d/makefilet-download-ondemand.mk
 
+PYTHON_TEST_ARGS = -m unittest discover tests/
+
 default-target: build
 
 distribute-pypi:
