@@ -3,6 +3,7 @@ import datetime
 import sqlite3
 import statistics
 from typing import Callable, Optional, Sequence, Tuple
+import uuid
 
 from docbrown.models import calculate_progress, PassedPhase, Progress, Timings
 from docbrown.storage import StorageBackend
@@ -49,6 +50,9 @@ class SQLiteBackend(StorageBackend):
         ),
         (
             "ALTER TABLE timings ADD COLUMN ordinal INTEGER",
+        ),
+        (
+            "ALTER TABLE progress ADD COLUMN process_uuid TEXT",
         )
     )
 
@@ -90,12 +94,13 @@ class SQLiteBackend(StorageBackend):
                     (aggregator_key, phase, duration, index))
         self.clear_progress(ident)
 
-    def store_progress(self, ident: str, aggregator_key: str, phase: str,
+    def store_progress(self, ident: str, process_uuid: uuid.UUID, aggregator_key: str, phase: str,
                        entered_at: datetime.datetime) -> None:
         with self._cursor() as cursor:
-            cursor.execute('INSERT INTO progress(ident, aggregator_key, phase, entered_at) '
-                           'VALUES(?, ?, ?, ?);',
-                           [ident, aggregator_key, phase, entered_at.isoformat()])
+            cursor.execute(
+                'INSERT INTO progress(ident, process_uuid, aggregator_key, phase, entered_at) '
+                'VALUES(?, ?, ?, ?, ?);',
+                [ident, str(process_uuid), aggregator_key, phase, entered_at.isoformat()])
 
     def clear_progress(self, ident: str) -> None:
         with self._cursor() as cursor:
@@ -106,13 +111,16 @@ class SQLiteBackend(StorageBackend):
         aggregator_func = aggregate_avg if aggregator_func is None else aggregator_func
 
         with self._cursor() as cursor:
-            cursor.execute('SELECT aggregator_key, phase, entered_at FROM progress '
-                           'WHERE ident = ? ORDER BY entered_at;', [ident])
+            cursor.execute('SELECT aggregator_key, process_uuid, phase, entered_at '
+                           'FROM progress '
+                           'WHERE ident = ? '
+                           'ORDER BY entered_at;', [ident])
             passed_phases = cursor.fetchall()
             if len(passed_phases) == 0:
                 return None
 
         aggregator_key = passed_phases[-1][0]
+        process_uuid = passed_phases[-1][1]
         with self._cursor() as cursor:
             timings = aggregator_func(cursor, aggregator_key)
             if len(timings) == 0:
@@ -120,5 +128,7 @@ class SQLiteBackend(StorageBackend):
 
         timings = {phase: duration for phase, duration in timings}
         passed_phases = [PassedPhase(phase, datetime.datetime.fromisoformat(entered_at))
-                         for _, phase, entered_at in passed_phases]
-        return calculate_progress(passed_phases, timings, now)
+                         for _, _, phase, entered_at in passed_phases]
+        progress = calculate_progress(passed_phases, timings, now)
+        progress.process_uuid = uuid.UUID(process_uuid)
+        return progress

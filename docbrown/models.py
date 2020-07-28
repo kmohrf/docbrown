@@ -2,6 +2,7 @@ import collections
 import dataclasses
 import datetime
 from typing import List, Mapping, Sequence
+from uuid import UUID
 
 
 Timings = Mapping[str, float]
@@ -18,9 +19,13 @@ class Progress:
     duration: float
     progress: float
     is_stuck: bool
+    process_uuid: UUID = None
 
     def serialize(self):
-        return dataclasses.asdict(self)
+        data = dataclasses.asdict(self)
+        if self.process_uuid:
+            data['process_uuid'] = str(self.process_uuid)
+        return data
 
 
 def _clamp_progress(progress):

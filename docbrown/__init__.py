@@ -3,7 +3,7 @@ import datetime
 from functools import partial
 import os
 import uuid
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from docbrown.models import Progress
 from docbrown.storage import StorageBackend
@@ -35,15 +35,16 @@ def _calculate_timings(start, stop, phases):
     return result
 
 
-def _create_recorder(ident: str, store_progress: Callable[[str, datetime.datetime], None]):
+def _create_recorder(ident: str, store_progress):
     def record(phase_name: str):
         if phase_name in record.passed_phases:
             raise ValueError('already passed phase {}'.format(phase_name))
         now = datetime.datetime.now()
         record.passed_phases[phase_name] = now
-        store_progress(phase_name, now)
+        store_progress(phase=phase_name, process_uuid=record.uuid, entered_at=now)
     record.passed_phases = {}
     record.ident = ident
+    record.uuid = uuid.uuid4()
     return record
 
 
@@ -52,7 +53,7 @@ def record_progress(aggregator_key: str, ident: str = None, store: StorageBacken
     ident = ident if ident is not None else str(uuid.uuid4())
     store = _resolve_backend(store)
     store.clear_progress(ident)
-    store_progress = partial(store.store_progress, ident, aggregator_key)
+    store_progress = partial(store.store_progress, ident=ident, aggregator_key=aggregator_key)
     recorder = _create_recorder(ident, store_progress)
     start = datetime.datetime.now()
     try:
