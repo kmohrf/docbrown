@@ -4,8 +4,8 @@ import sqlite3
 import statistics
 from typing import Callable, Optional, Sequence, Tuple
 
-from docbrown.models import PassedPhase, Progress, Timings
-from docbrown.storage import _calculate_progress, StorageBackend
+from docbrown.models import calculate_progress, PassedPhase, Progress, Timings
+from docbrown.storage import StorageBackend
 
 
 TimingsResultSet = Sequence[Tuple[str, float]]
@@ -121,4 +121,4 @@ class SQLiteBackend(StorageBackend):
         timings = {phase: duration for phase, duration in timings}
         passed_phases = [PassedPhase(phase, datetime.datetime.fromisoformat(entered_at))
                          for _, phase, entered_at in passed_phases]
-        return _calculate_progress(passed_phases, timings, now)
+        return calculate_progress(passed_phases, timings, now)
